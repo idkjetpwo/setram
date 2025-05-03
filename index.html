@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setram - Chat-App</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Firebase SDK -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -17,24 +17,33 @@
             <h2>Anmelden bei Setram</h2>
             <input type="text" id="username" placeholder="Benutzername">
             <input type="password" id="password" placeholder="Passwort">
-            <button onclick="anmelden()">Anmelden</button>
-            <button onclick="registrieren()">Registrieren</button>
+            <button onclick="anmelden()"><i class="fas fa-sign-in-alt"></i> Anmelden</button>
+            <button onclick="registrieren()"><i class="fas fa-user-plus"></i> Registrieren</button>
         </div>
 
-        <!-- Hauptbereich (wird erst nach Anmeldung angezeigt) -->
+        <!-- Hauptbereich -->
         <div id="haupt-bereich" style="display: none;">
+            <!-- Profil oben rechts -->
+            <div class="profil">
+                <i class="fas fa-user"></i>
+                <span id="profil-username"></span>
+            </div>
             <div class="sidebar">
                 <h3>Freunde</h3>
                 <input type="text" id="freund-username" placeholder="Freund per Benutzername hinzufügen">
-                <button onclick="freundHinzufuegen()">Freund hinzufügen</button>
+                <button onclick="freundHinzufuegen()"><i class="fas fa-user-plus"></i> Freund hinzufügen</button>
                 <div id="freunde-liste"></div>
-                <button onclick="abmelden()">Abmelden</button>
+                <h3>Blockierte Benutzer</h3>
+                <div id="blockierte-liste"></div>
+                <button onclick="abmelden()"><i class="fas fa-sign-out-alt"></i> Abmelden</button>
             </div>
             <div class="chat-bereich">
                 <h3>Chat</h3>
                 <div id="chat-nachrichten"></div>
-                <input type="text" id="chat-eingabe" placeholder="Nachricht schreiben">
-                <button onclick="nachrichtSenden()">Senden</button>
+                <div class="chat-eingabe-bereich">
+                    <input type="text" id="chat-eingabe" placeholder="Nachricht schreiben">
+                    <button onclick="nachrichtSenden()"><i class="fas fa-paper-plane"></i> Senden</button>
+                </div>
             </div>
         </div>
     </div>
