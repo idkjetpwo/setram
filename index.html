@@ -4,17 +4,163 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setram - Chat-App</title>
-    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #1e2124;
+            color: #dcddde;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            height: 100vh;
+        }
+
+        #fehlermeldung {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff4444;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+
+        #login-bereich {
+            margin: auto;
+            text-align: center;
+            background-color: #2f3136;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #login-bereich h2 {
+            color: #7289da;
+            margin-bottom: 20px;
+        }
+
+        .profil {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #2f3136;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .profil i {
+            color: #7289da;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #2f3136;
+            padding: 20px;
+            border-right: 1px solid #202225;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            color: #7289da;
+            margin-bottom: 10px;
+        }
+
+        .chat-bereich {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            background-color: #36393f;
+        }
+
+        #chat-nachrichten {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #40444b;
+            border-radius: 5px;
+        }
+
+        #chat-nachrichten div {
+            margin: 10px 0;
+            padding: 8px;
+            background-color: #4f545c;
+            border-radius: 5px;
+        }
+
+        .chat-eingabe-bereich {
+            display: flex;
+            gap: 10px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input {
+            background-color: #40444b;
+            color: #dcddde;
+        }
+
+        button {
+            background-color: #7289da;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        button:hover {
+            background-color: #677bc4;
+        }
+
+        button i {
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            #app {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid #202225;
+            }
+            .chat-bereich {
+                flex: 1;
+            }
+            .profil {
+                position: static;
+                margin: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div id="app">
-        <!-- Fehlermeldung -->
         <div id="fehlermeldung" style="display: none;"></div>
-        <!-- Anmeldebereich -->
         <div id="login-bereich">
             <h2>Anmelden bei Setram</h2>
             <input type="text" id="username" placeholder="Benutzername">
@@ -22,7 +168,6 @@
             <button onclick="anmelden()"><i class="fas fa-sign-in-alt"></i> Anmelden</button>
             <button onclick="registrieren()"><i class="fas fa-user-plus"></i> Registrieren</button>
         </div>
-        <!-- Hauptbereich -->
         <div id="haupt-bereich" style="display: none;">
             <div class="profil">
                 <i class="fas fa-user"></i>
@@ -47,6 +192,249 @@
             </div>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script>
+        // Firebase-Konfiguration
+        const firebaseConfig = {
+            apiKey: "DEIN_API_SCHLUESSEL",
+            authDomain: "setram-abe73.firebaseapp.com",
+            projectId: "setram-abe73",
+            storageBucket: "setram-abe73.firebasestorage.app",
+            messagingSenderId: "612633884731",
+            appId: "1:612633884731:web:dda5b787caa1a8e74cc41e",
+            measurementId: "G-VC7FK0FSGV"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Globale Variablen
+        let aktuellerBenutzer = null;
+        let ausgewaehlterFreund = null;
+        let aktuellerBenutzername = null;
+
+        // Funktion, um Fehlermeldungen anzuzeigen
+        function zeigeFehlermeldung(nachricht) {
+            const fehlermeldungDiv = document.getElementById('fehlermeldung');
+            fehlermeldungDiv.textContent = nachricht;
+            fehlermeldungDiv.style.display = 'block';
+            setTimeout(() => {
+                fehlermeldungDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // Prüfen, ob ein Benutzer angemeldet ist
+        auth.onAuthStateChanged(benutzer => {
+            if (benutzer) {
+                aktuellerBenutzer = benutzer.uid;
+                db.collection('users').doc(aktuellerBenutzer).get().then(dokument => {
+                    aktuellerBenutzername = dokument.data().username;
+                    document.getElementById('profil-username').textContent = aktuellerBenutzername;
+                    document.getElementById('login-bereich').style.display = 'none';
+                    document.getElementById('haupt-bereich').style.display = 'flex';
+                    freundeLaden();
+                });
+            } else {
+                aktuellerBenutzer = null;
+                aktuellerBenutzername = null;
+                document.getElementById('login-bereich').style.display = 'block';
+                document.getElementById('haupt-bereich').style.display = 'none';
+                document.getElementById('profil-username').textContent = '';
+            }
+        });
+
+        // Anmelden
+        function anmelden() {
+            const benutzername = document.getElementById('username').value;
+            const passwort = document.getElementById('password').value;
+            const email = `${benutzername}@setram.com`;
+            auth.signInWithEmailAndPassword(email, passwort).catch(fehler => zeigeFehlermeldung(fehler.message));
+        }
+
+        // Registrieren
+        function registrieren() {
+            const benutzername = document.getElementById('username').value;
+            const passwort = document.getElementById('password').value;
+            const email = `${benutzername}@setram.com`;
+
+            db.collection('users')
+                .where('username', '==', benutzername)
+                .get()
+                .then(abfrage => {
+                    if (!abfrage.empty) {
+                        zeigeFehlermeldung('Dieser Benutzername ist schon vergeben! Wähle einen anderen.');
+                        return;
+                    }
+
+                    auth.createUserWithEmailAndPassword(email, passwort)
+                        .then(benutzerDaten => {
+                            const benutzer = benutzerDaten.user;
+                            db.collection('users').doc(benutzer.uid).set({
+                                username: benutzername,
+                                friends: [],
+                                blocked: []
+                            }).then(() => {
+                                document.getElementById('username').value = '';
+                                document.getElementById('password').value = '';
+                                zeigeFehlermeldung('Registrierung erfolgreich! Bitte melde dich an.');
+                            });
+                        })
+                        .catch(fehler => zeigeFehlermeldung(fehler.message));
+                });
+        }
+
+        // Abmelden
+        function abmelden() {
+            auth.signOut();
+        }
+
+        // Freund hinzufügen
+        function freundHinzufuegen() {
+            const freundBenutzername = document.getElementById('freund-username').value.trim();
+            if (freundBenutzername === '') {
+                zeigeFehlermeldung('Bitte gib einen Benutzernamen ein!');
+                return;
+            }
+
+            db.collection('users')
+                .where('username', '==', freundBenutzername)
+                .get()
+                .then(abfrage => {
+                    if (abfrage.empty) {
+                        zeigeFehlermeldung('Benutzer nicht gefunden! Überprüfe den Benutzernamen.');
+                        return;
+                    }
+
+                    const freundId = abfrage.docs[0].id;
+                    if (freundId === aktuellerBenutzer) {
+                        zeigeFehlermeldung('Du kannst dich nicht selbst als Freund hinzufügen!');
+                        return;
+                    }
+
+                    db.collection('users').doc(aktuellerBenutzer).update({
+                        friends: firebase.firestore.FieldValue.arrayUnion(freundId)
+                    }).then(() => {
+                        document.getElementById('freund-username').value = '';
+                    });
+                })
+                .catch(fehler => {
+                    console.error('Fehler beim Hinzufügen des Freundes:', fehler);
+                    zeigeFehlermeldung('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+                });
+        }
+
+        // Freunde laden und anzeigen
+        function freundeLaden() {
+            db.collection('users').doc(aktuellerBenutzer).onSnapshot(dokument => {
+                const freunde = dokument.data().friends || [];
+                const freundeListe = document.getElementById('freunde-liste');
+                freundeListe.innerHTML = '';
+                freunde.forEach(freundId => {
+                    db.collection('users').doc(freundId).get().then(freundDokument => {
+                        if (freundDokument.exists) {
+                            const freundBenutzername = freundDokument.data().username;
+                            const freundDiv = document.createElement('div');
+                            freundDiv.innerHTML = `
+                                <i class="fas fa-user"></i> ${freundBenutzername}
+                                <button onclick="freundAuswaehlen('${freundId}')"><i class="fas fa-comment"></i> Chat</button>
+                                <button onclick="freundEntfernen('${freundId}')"><i class="fas fa-trash"></i> Entfernen</button>
+                                <button onclick="freundBlockieren('${freundId}')"><i class="fas fa-ban"></i> Blockieren</button>
+                            `;
+                            freundeListe.appendChild(freundDiv);
+                        }
+                    });
+                });
+                blockierteLaden();
+            });
+        }
+
+        // Blockierte Benutzer laden
+        function blockierteLaden() {
+            db.collection('users').doc(aktuellerBenutzer).onSnapshot(dokument => {
+                const blockierte = dokument.data().blocked || [];
+                const blockierteListe = document.getElementById('blockierte-liste');
+                blockierteListe.innerHTML = '';
+                blockierte.forEach(blockierterId => {
+                    db.collection('users').doc(blockierterId).get().then(blockierterDokument => {
+                        if (blockierterDokument.exists) {
+                            const blockierterBenutzername = blockierterDokument.data().username;
+                            const blockierterDiv = document.createElement('div');
+                            blockierterDiv.innerHTML = `
+                                <i class="fas fa-user-slash"></i> ${blockierterBenutzername}
+                                <button onclick="freundEntblockieren('${blockierterId}')"><i class="fas fa-unlock"></i> Entblockieren</button>
+                            `;
+                            blockierteListe.appendChild(blockierterDiv);
+                        }
+                    });
+                });
+            });
+        }
+
+        // Freund auswählen, um zu chatten
+        function freundAuswaehlen(freundId) {
+            ausgewaehlterFreund = freundId;
+            nachrichtenLaden();
+        }
+
+        // Freund entfernen
+        function freundEntfernen(freundId) {
+            db.collection('users').doc(aktuellerBenutzer).update({
+                friends: firebase.firestore.FieldValue.arrayRemove(freundId)
+            });
+        }
+
+        // Freund blockieren
+        function freundBlockieren(freundId) {
+            db.collection('users').doc(aktuellerBenutzer).update({
+                friends: firebase.firestore.FieldValue.arrayRemove(freundId),
+                blocked: firebase.firestore.FieldValue.arrayUnion(freundId)
+            });
+        }
+
+        // Freund entblockieren
+        function freundEntblockieren(blockierterId) {
+            db.collection('users').doc(aktuellerBenutzer).update({
+                blocked: firebase.firestore.FieldValue.arrayRemove(blockierterId)
+            });
+        }
+
+        // Nachricht senden
+        function nachrichtSenden() {
+            if (!ausgewaehlterFreund) {
+                zeigeFehlermeldung('Wähle einen Freund zum Chatten aus!');
+                return;
+            }
+            const nachricht = document.getElementById('chat-eingabe').value;
+            if (nachricht.trim() === '') return;
+            const zeitstempel = new Date().toLocaleTimeString();
+            db.collection('messages').add({
+                senderId: aktuellerBenutzer,
+                receiverId: ausgewaehlterFreund,
+                message: nachricht,
+                timestamp: zeitstempel
+            });
+            document.getElementById('chat-eingabe').value = '';
+        }
+
+        // Nachrichten in Echtzeit laden
+        function nachrichtenLaden() {
+            if (!ausgewaehlterFreund) return;
+            const chatNachrichten = document.getElementById('chat-nachrichten');
+            chatNachrichten.innerHTML = '';
+            db.collection('messages')
+                .where('senderId', 'in', [aktuellerBenutzer, ausgewaehlterFreund])
+                .where('receiverId', 'in', [aktuellerBenutzer, ausgewaehlterFreund])
+                .orderBy('timestamp')
+                .onSnapshot(abfrage => {
+                    chatNachrichten.innerHTML = '';
+                    abfrage.forEach(dokument => {
+                        const daten = dokument.data();
+                        const nachrichtDiv = document.createElement('div');
+                        nachrichtDiv.textContent = `${daten.senderId === aktuellerBenutzer ? 'Du' : 'Freund'} (${daten.timestamp}): ${daten.message}`;
+                        chatNachrichten.appendChild(nachrichtDiv);
+                        chatNachrichten.scrollTop = chatNachrichten.scrollHeight;
+                    });
+                });
+        }
+    </script>
 </body>
 </html>
