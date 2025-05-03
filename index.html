@@ -227,11 +227,18 @@
             if (benutzer) {
                 aktuellerBenutzer = benutzer.uid;
                 db.collection('users').doc(aktuellerBenutzer).get().then(dokument => {
-                    aktuellerBenutzername = dokument.data().username;
-                    document.getElementById('profil-username').textContent = aktuellerBenutzername;
-                    document.getElementById('login-bereich').style.display = 'none';
-                    document.getElementById('haupt-bereich').style.display = 'flex';
-                    freundeLaden();
+                    if (dokument.exists) {
+                        aktuellerBenutzername = dokument.data().username;
+                        document.getElementById('profil-username').textContent = aktuellerBenutzername;
+                        document.getElementById('login-bereich').style.display = 'none';
+                        document.getElementById('haupt-bereich').style.display = 'flex';
+                        freundeLaden();
+                    } else {
+                        zeigeFehlermeldung('Benutzerdaten nicht gefunden. Bitte registriere dich erneut.');
+                        auth.signOut();
+                    }
+                }).catch(fehler => {
+                    zeigeFehlermeldung('Fehler beim Laden der Benutzerdaten.');
                 });
             } else {
                 aktuellerBenutzer = null;
@@ -244,16 +251,33 @@
 
         // Anmelden
         function anmelden() {
-            const benutzername = document.getElementById('username').value;
-            const passwort = document.getElementById('password').value;
+            const benutzername = document.getElementById('username').value.trim();
+            const passwort = document.getElementById('password').value.trim();
+            if (!benutzername || !passwort) {
+                zeigeFehlermeldung('Bitte gib einen Benutzernamen und ein Passwort ein.');
+                return;
+            }
             const email = `${benutzername}@setram.com`;
-            auth.signInWithEmailAndPassword(email, passwort).catch(fehler => zeigeFehlermeldung(fehler.message));
+            auth.signInWithEmailAndPassword(email, passwort)
+                .catch(fehler => {
+                    if (fehler.code === 'auth/wrong-password') {
+                        zeigeFehlermeldung('Falsches Passwort. Bitte überprüfe dein Passwort.');
+                    } else if (fehler.code === 'auth/user-not-found') {
+                        zeigeFehlermeldung('Benutzer nicht gefunden. Bitte registriere dich.');
+                    } else {
+                        zeigeFehlermeldung('Fehler beim Anmelden: ' + fehler.message);
+                    }
+                });
         }
 
         // Registrieren
         function registrieren() {
-            const benutzername = document.getElementById('username').value;
-            const passwort = document.getElementById('password').value;
+            const benutzername = document.getElementById('username').value.trim();
+            const passwort = document.getElementById('password').value.trim();
+            if (!benutzername || !passwort) {
+                zeigeFehlermeldung('Bitte gib einen Benutzernamen und ein Passwort ein.');
+                return;
+            }
             const email = `${benutzername}@setram.com`;
 
             db.collection('users')
@@ -276,9 +300,20 @@
                                 document.getElementById('username').value = '';
                                 document.getElementById('password').value = '';
                                 zeigeFehlermeldung('Registrierung erfolgreich! Bitte melde dich an.');
+                            }).catch(fehler => {
+                                zeigeFehlermeldung('Fehler beim Speichern der Benutzerdaten.');
                             });
                         })
-                        .catch(fehler => zeigeFehlermeldung(fehler.message));
+                        .catch(fehler => {
+                            if (fehler.code === 'auth/email-already-in-use') {
+                                zeigeFehlermeldung('Dieser Benutzername ist schon vergeben! Wähle einen anderen.');
+                            } else {
+                                zeigeFehlermeldung('Fehler beim Registrieren: ' + fehler.message);
+                            }
+                        });
+                })
+                .catch(fehler => {
+                    zeigeFehlermeldung('Fehler bei der Benutzername-Überprüfung.');
                 });
         }
 
@@ -314,17 +349,20 @@
                         friends: firebase.firestore.FieldValue.arrayUnion(freundId)
                     }).then(() => {
                         document.getElementById('freund-username').value = '';
+                        zeigeFehlermeldung('Freund erfolgreich hinzugefügt!');
+                    }).catch(fehler => {
+                        zeigeFehlermeldung('Fehler beim Hinzufügen des Freundes.');
                     });
                 })
                 .catch(fehler => {
-                    console.error('Fehler beim Hinzufügen des Freundes:', fehler);
-                    zeigeFehlermeldung('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+                    zeigeFehlermeldung('Fehler bei der Freundesuche.');
                 });
         }
 
         // Freunde laden und anzeigen
         function freundeLaden() {
             db.collection('users').doc(aktuellerBenutzer).onSnapshot(dokument => {
+                if (!dokument.exists) return;
                 const freunde = dokument.data().friends || [];
                 const freundeListe = document.getElementById('freunde-liste');
                 freundeListe.innerHTML = '';
@@ -335,21 +373,26 @@
                             const freundDiv = document.createElement('div');
                             freundDiv.innerHTML = `
                                 <i class="fas fa-user"></i> ${freundBenutzername}
-                                <button onclick="freundAuswaehlen('${freundId}')"><i class="fas fa-comment"></i> Chat</button>
+                                <button onclick="freundAuswaehlen('${freundId}', '${freundBenutzername}')"><i class="fas fa-comment"></i> Chat</button>
                                 <button onclick="freundEntfernen('${freundId}')"><i class="fas fa-trash"></i> Entfernen</button>
                                 <button onclick="freundBlockieren('${freundId}')"><i class="fas fa-ban"></i> Blockieren</button>
                             `;
                             freundeListe.appendChild(freundDiv);
                         }
+                    }).catch(fehler => {
+                        zeigeFehlermeldung('Fehler beim Laden der Freunde.');
                     });
                 });
                 blockierteLaden();
+            }, fehler => {
+                zeigeFehlermeldung('Fehler beim Aktualisieren der Freundesliste.');
             });
         }
 
         // Blockierte Benutzer laden
         function blockierteLaden() {
             db.collection('users').doc(aktuellerBenutzer).onSnapshot(dokument => {
+                if (!dokument.exists) return;
                 const blockierte = dokument.data().blocked || [];
                 const blockierteListe = document.getElementById('blockierte-liste');
                 blockierteListe.innerHTML = '';
@@ -364,14 +407,19 @@
                             `;
                             blockierteListe.appendChild(blockierterDiv);
                         }
+                    }).catch(fehler => {
+                        zeigeFehlermeldung('Fehler beim Laden der blockierten Benutzer.');
                     });
                 });
+            }, fehler => {
+                zeigeFehlermeldung('Fehler beim Aktualisieren der blockierten Liste.');
             });
         }
 
         // Freund auswählen, um zu chatten
-        function freundAuswaehlen(freundId) {
+        function freundAuswaehlen(freundId, freundBenutzername) {
             ausgewaehlterFreund = freundId;
+            document.querySelector('.chat-bereich h3').textContent = `Chat mit ${freundBenutzername}`;
             nachrichtenLaden();
         }
 
@@ -379,6 +427,8 @@
         function freundEntfernen(freundId) {
             db.collection('users').doc(aktuellerBenutzer).update({
                 friends: firebase.firestore.FieldValue.arrayRemove(freundId)
+            }).catch(fehler => {
+                zeigeFehlermeldung('Fehler beim Entfernen des Freundes.');
             });
         }
 
@@ -387,6 +437,8 @@
             db.collection('users').doc(aktuellerBenutzer).update({
                 friends: firebase.firestore.FieldValue.arrayRemove(freundId),
                 blocked: firebase.firestore.FieldValue.arrayUnion(freundId)
+            }).catch(fehler => {
+                zeigeFehlermeldung('Fehler beim Blockieren des Freundes.');
             });
         }
 
@@ -394,6 +446,8 @@
         function freundEntblockieren(blockierterId) {
             db.collection('users').doc(aktuellerBenutzer).update({
                 blocked: firebase.firestore.FieldValue.arrayRemove(blockierterId)
+            }).catch(fehler => {
+                zeigeFehlermeldung('Fehler beim Entblockieren.');
             });
         }
 
@@ -411,8 +465,11 @@
                 receiverId: ausgewaehlterFreund,
                 message: nachricht,
                 timestamp: zeitstempel
+            }).then(() => {
+                document.getElementById('chat-eingabe').value = '';
+            }).catch(fehler => {
+                zeigeFehlermeldung('Fehler beim Senden der Nachricht.');
             });
-            document.getElementById('chat-eingabe').value = '';
         }
 
         // Nachrichten in Echtzeit laden
@@ -433,6 +490,8 @@
                         chatNachrichten.appendChild(nachrichtDiv);
                         chatNachrichten.scrollTop = chatNachrichten.scrollHeight;
                     });
+                }, fehler => {
+                    zeigeFehlermeldung('Fehler beim Laden der Nachrichten.');
                 });
         }
     </script>
