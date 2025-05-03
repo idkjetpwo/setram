@@ -12,6 +12,8 @@
 </head>
 <body>
     <div id="app">
+        <!-- Fehlermeldung -->
+        <div id="fehlermeldung" style="display: none;"></div>
         <!-- Anmeldebereich -->
         <div id="login-bereich">
             <h2>Anmelden bei Setram</h2>
@@ -20,10 +22,8 @@
             <button onclick="anmelden()"><i class="fas fa-sign-in-alt"></i> Anmelden</button>
             <button onclick="registrieren()"><i class="fas fa-user-plus"></i> Registrieren</button>
         </div>
-
         <!-- Hauptbereich -->
         <div id="haupt-bereich" style="display: none;">
-            <!-- Profil oben rechts -->
             <div class="profil">
                 <i class="fas fa-user"></i>
                 <span id="profil-username"></span>
