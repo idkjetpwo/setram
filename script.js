@@ -16,18 +16,25 @@ const db = firebase.firestore();
 // Globale Variablen
 let aktuellerBenutzer = null;
 let ausgewaehlterFreund = null;
+let aktuellerBenutzername = null;
 
 // Prüfen, ob ein Benutzer angemeldet ist
 auth.onAuthStateChanged(benutzer => {
     if (benutzer) {
         aktuellerBenutzer = benutzer.uid;
-        document.getElementById('login-bereich').style.display = 'none';
-        document.getElementById('haupt-bereich').style.display = 'flex';
-        freundeLaden();
+        db.collection('users').doc(aktuellerBenutzer).get().then(dokument => {
+            aktuellerBenutzername = dokument.data().username;
+            document.getElementById('profil-username').textContent = aktuellerBenutzername;
+            document.getElementById('login-bereich').style.display = 'none';
+            document.getElementById('haupt-bereich').style.display = 'flex';
+            freundeLaden();
+        });
     } else {
         aktuellerBenutzer = null;
+        aktuellerBenutzername = null;
         document.getElementById('login-bereich').style.display = 'block';
         document.getElementById('haupt-bereich').style.display = 'none';
+        document.getElementById('profil-username').textContent = '';
     }
 });
 
@@ -44,16 +51,31 @@ function registrieren() {
     const benutzername = document.getElementById('username').value;
     const passwort = document.getElementById('password').value;
     const email = `${benutzername}@setram.com`;
-    auth.createUserWithEmailAndPassword(email, passwort)
-        .then(benutzerDaten => {
-            const benutzer = benutzerDaten.user;
-            db.collection('users').doc(benutzer.uid).set({
-                username: benutzername,
-                friends: [],
-                blocked: []
-            });
-        })
-        .catch(fehler => alert(fehler.message));
+
+    db.collection('users')
+        .where('username', '==', benutzername)
+        .get()
+        .then(abfrage => {
+            if (!abfrage.empty) {
+                alert('Dieser Benutzername ist schon vergeben! Wähle einen anderen.');
+                return;
+            }
+
+            auth.createUserWithEmailAndPassword(email, passwort)
+                .then(benutzerDaten => {
+                    const benutzer = benutzerDaten.user;
+                    db.collection('users').doc(benutzer.uid).set({
+                        username: benutzername,
+                        friends: [],
+                        blocked: []
+                    }).then(() => {
+                        document.getElementById('username').value = '';
+                        document.getElementById('password').value = '';
+                        alert('Registrierung erfolgreich! Bitte melde dich an.');
+                    });
+                })
+                .catch(fehler => alert(fehler.message));
+        });
 }
 
 // Abmelden
@@ -63,19 +85,36 @@ function abmelden() {
 
 // Freund hinzufügen
 function freundHinzufuegen() {
-    const freundBenutzername = document.getElementById('freund-username').value;
+    const freundBenutzername = document.getElementById('freund-username').value.trim();
+    if (freundBenutzername === '') {
+        alert('Bitte gib einen Benutzernamen ein!');
+        return;
+    }
+
     db.collection('users')
         .where('username', '==', freundBenutzername)
         .get()
         .then(abfrage => {
-            if (!abfrage.empty) {
-                const freundId = abfrage.docs[0].id;
-                db.collection('users').doc(aktuellerBenutzer).update({
-                    friends: firebase.firestore.FieldValue.arrayUnion(freundId)
-                });
-            } else {
-                alert('Benutzer nicht gefunden!');
+            if (abfrage.empty) {
+                alert('Benutzer nicht gefunden! Überprüfe den Benutzernamen.');
+                return;
             }
+
+            const freundId = abfrage.docs[0].id;
+            if (freundId === aktuellerBenutzer) {
+                alert('Du kannst dich nicht selbst als Freund hinzufügen!');
+                return;
+            }
+
+            db.collection('users').doc(aktuellerBenutzer).update({
+                friends: firebase.firestore.FieldValue.arrayUnion(freundId)
+            }).then(() => {
+                document.getElementById('freund-username').value = '';
+            });
+        })
+        .catch(fehler => {
+            console.error('Fehler beim Hinzufügen des Freundes:', fehler);
+            alert('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
         });
 }
 
@@ -87,15 +126,40 @@ function freundeLaden() {
         freundeListe.innerHTML = '';
         freunde.forEach(freundId => {
             db.collection('users').doc(freundId).get().then(freundDokument => {
-                const freundBenutzername = freundDokument.data().username;
-                const freundDiv = document.createElement('div');
-                freundDiv.innerHTML = `
-                    ${freundBenutzername}
-                    <button onclick="freundAuswaehlen('${freundId}')">Chat</button>
-                    <button onclick="freundEntfernen('${freundId}')">Entfernen</button>
-                    <button onclick="freundBlockieren('${freundId}')">Blockieren</button>
-                `;
-                freundeListe.appendChild(freundDiv);
+                if (freundDokument.exists) {
+                    const freundBenutzername = freundDokument.data().username;
+                    const freundDiv = document.createElement('div');
+                    freundDiv.innerHTML = `
+                        <i class="fas fa-user"></i> ${freundBenutzername}
+                        <button onclick="freundAuswaehlen('${freundId}')"><i class="fas fa-comment"></i> Chat</button>
+                        <button onclick="freundEntfernen('${freundId}')"><i class="fas fa-trash"></i> Entfernen</button>
+                        <button onclick="freundBlockieren('${freundId}')"><i class="fas fa-ban"></i> Blockieren</button>
+                    `;
+                    freundeListe.appendChild(freundDiv);
+                }
+            });
+        });
+        blockierteLaden();
+    });
+}
+
+// Blockierte Benutzer laden
+function blockierteLaden() {
+    db.collection('users').doc(aktuellerBenutzer).onSnapshot(dokument => {
+        const blockierte = dokument.data().blocked || [];
+        const blockierteListe = document.getElementById('blockierte-liste');
+        blockierteListe.innerHTML = '';
+        blockierte.forEach(blockierterId => {
+            db.collection('users').doc(blockierterId).get().then(blockierterDokument => {
+                if (blockierterDokument.exists) {
+                    const blockierterBenutzername = blockierterDokument.data().username;
+                    const blockierterDiv = document.createElement('div');
+                    blockierterDiv.innerHTML = `
+                        <i class="fas fa-user-slash"></i> ${blockierterBenutzername}
+                        <button onclick="freundEntblockieren('${blockierterId}')"><i class="fas fa-unlock"></i> Entblockieren</button>
+                    `;
+                    blockierteListe.appendChild(blockierterDiv);
+                }
             });
         });
     });
@@ -119,6 +183,13 @@ function freundBlockieren(freundId) {
     db.collection('users').doc(aktuellerBenutzer).update({
         friends: firebase.firestore.FieldValue.arrayRemove(freundId),
         blocked: firebase.firestore.FieldValue.arrayUnion(freundId)
+    });
+}
+
+// Freund entblockieren
+function freundEntblockieren(blockierterId) {
+    db.collection('users').doc(aktuellerBenutzer).update({
+        blocked: firebase.firestore.FieldValue.arrayRemove(blockierterId)
     });
 }
 
