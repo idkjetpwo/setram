@@ -18,6 +18,16 @@ let aktuellerBenutzer = null;
 let ausgewaehlterFreund = null;
 let aktuellerBenutzername = null;
 
+// Funktion, um Fehlermeldungen anzuzeigen
+function zeigeFehlermeldung(nachricht) {
+    const fehlermeldungDiv = document.getElementById('fehlermeldung');
+    fehlermeldungDiv.textContent = nachricht;
+    fehlermeldungDiv.style.display = 'block';
+    setTimeout(() => {
+        fehlermeldungDiv.style.display = 'none';
+    }, 3000);
+}
+
 // Prüfen, ob ein Benutzer angemeldet ist
 auth.onAuthStateChanged(benutzer => {
     if (benutzer) {
@@ -43,7 +53,7 @@ function anmelden() {
     const benutzername = document.getElementById('username').value;
     const passwort = document.getElementById('password').value;
     const email = `${benutzername}@setram.com`;
-    auth.signInWithEmailAndPassword(email, passwort).catch(fehler => alert(fehler.message));
+    auth.signInWithEmailAndPassword(email, passwort).catch(fehler => zeigeFehlermeldung(fehler.message));
 }
 
 // Registrieren
@@ -57,7 +67,7 @@ function registrieren() {
         .get()
         .then(abfrage => {
             if (!abfrage.empty) {
-                alert('Dieser Benutzername ist schon vergeben! Wähle einen anderen.');
+                zeigeFehlermeldung('Dieser Benutzername ist schon vergeben! Wähle einen anderen.');
                 return;
             }
 
@@ -71,10 +81,10 @@ function registrieren() {
                     }).then(() => {
                         document.getElementById('username').value = '';
                         document.getElementById('password').value = '';
-                        alert('Registrierung erfolgreich! Bitte melde dich an.');
+                        zeigeFehlermeldung('Registrierung erfolgreich! Bitte melde dich an.');
                     });
                 })
-                .catch(fehler => alert(fehler.message));
+                .catch(fehler => zeigeFehlermeldung(fehler.message));
         });
 }
 
@@ -87,7 +97,7 @@ function abmelden() {
 function freundHinzufuegen() {
     const freundBenutzername = document.getElementById('freund-username').value.trim();
     if (freundBenutzername === '') {
-        alert('Bitte gib einen Benutzernamen ein!');
+        zeigeFehlermeldung('Bitte gib einen Benutzernamen ein!');
         return;
     }
 
@@ -96,13 +106,13 @@ function freundHinzufuegen() {
         .get()
         .then(abfrage => {
             if (abfrage.empty) {
-                alert('Benutzer nicht gefunden! Überprüfe den Benutzernamen.');
+                zeigeFehlermeldung('Benutzer nicht gefunden! Überprüfe den Benutzernamen.');
                 return;
             }
 
             const freundId = abfrage.docs[0].id;
             if (freundId === aktuellerBenutzer) {
-                alert('Du kannst dich nicht selbst als Freund hinzufügen!');
+                zeigeFehlermeldung('Du kannst dich nicht selbst als Freund hinzufügen!');
                 return;
             }
 
@@ -114,7 +124,7 @@ function freundHinzufuegen() {
         })
         .catch(fehler => {
             console.error('Fehler beim Hinzufügen des Freundes:', fehler);
-            alert('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+            zeigeFehlermeldung('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
         });
 }
 
@@ -196,7 +206,7 @@ function freundEntblockieren(blockierterId) {
 // Nachricht senden
 function nachrichtSenden() {
     if (!ausgewaehlterFreund) {
-        alert('Wähle einen Freund zum Chatten aus!');
+        zeigeFehlermeldung('Wähle einen Freund zum Chatten aus!');
         return;
     }
     const nachricht = document.getElementById('chat-eingabe').value;
